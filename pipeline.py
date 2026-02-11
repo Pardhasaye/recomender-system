@@ -14,6 +14,7 @@ try:
     from data_loader import load_jsonl
     from trust_model import TrustworthyRecommender
     from rl_env import TrustworthyRLEnvironment
+    from interactive_checker import run_interactive_mode
 except ImportError as e:
     print(f"❌ Error importing modules: {e}")
     # Fallback to local import if needed (e.g. if running as script vs package)
@@ -315,6 +316,23 @@ def main():
         sample_asins = np.random.choice(rl_env.product_asins, 3, replace=False)
         for asin in sample_asins:
             predict_product_trust(asin)
+        
+        # ===== STEP 11: INTERACTIVE MODE =====
+        print("\n[STEP 11] INTERACTIVE MODE")
+        print("="*60)
+        print("\nYou can now interactively check product trustworthiness!")
+        print("Options:")
+        print("  1. Check specific ASIN")
+        print("  2. Check N random products")
+        
+        user_input = input("\nWould you like to enter interactive mode? (y/n): ").strip().lower()
+        
+        if user_input in ['y', 'yes']:
+            # Launch interactive mode with trained model
+            run_interactive_mode(rl_env, rl_model, threshold=0.5)
+        else:
+            print("\nSkipping interactive mode.")
+            
             
     else:
         print("\n[WARN] RL libraries not available; skipping RL training and evaluation.")

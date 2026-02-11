@@ -52,10 +52,31 @@ class TrustworthyRecommender:
         u_trust = 0.3 * v_ratio + 0.25 * h_ratio + 0.2 * c_rating + 0.25 * q_text
         return np.clip(u_trust, 0.0, 1.0)
     
-    def product_trust_score(self, df_reviews, df_products, asin):
-        """Calculate product trustworthiness score"""
+    def product_trust_score(self, df_reviews, df_products, asin, return_details=False):
+        """Calculate product trustworthiness score
+        
+        Args:
+            df_reviews: DataFrame of reviews
+            df_products: DataFrame of products
+            asin: Product ASIN
+            return_details: If True, return dict with intermediate values; if False, return float
+            
+        Returns:
+            float or dict: Product trust score or detailed breakdown
+        """
         product_reviews = df_reviews[df_reviews['asin'] == asin]
-        if len(product_reviews) == 0: return 0.0
+        if len(product_reviews) == 0:
+            if return_details:
+                return {
+                    'product_trust': 0.0,
+                    'avg_rating_norm': 0.0,
+                    'verified_ratio': 0.0,
+                    'review_confidence': 0.0,
+                    'text_quality': 0.0,
+                    'price_factor': 1.0,
+                    'title_similarity': 0.0
+                }
+            return 0.0
         
         if 'rating' in product_reviews.columns:
             ratings = pd.to_numeric(product_reviews['rating'], errors='coerce')
@@ -70,6 +91,10 @@ class TrustworthyRecommender:
         else:
             v_share = 0.0
         rn_conf = 1 - np.exp(-rating_num / 1000)
+        
+        # Text quality metric
+        text_lengths = product_reviews['text'].fillna('').str.len()
+        text_quality = np.clip(text_lengths.mean() / 500, 0, 1)
         
         # Price abnormality factor
         price_factor = 1.0
@@ -110,7 +135,19 @@ class TrustworthyRecommender:
             0.15 * price_factor +
             0.15 * title_sim
         )
-        return np.clip(p_trust, 0, 1)
+        p_trust = np.clip(p_trust, 0, 1)
+        
+        if return_details:
+            return {
+                'product_trust': float(p_trust),
+                'avg_rating_norm': float(avg_rating / 5.0),
+                'verified_ratio': float(v_share),
+                'review_confidence': float(rn_conf),
+                'text_quality': float(text_quality),
+                'price_factor': float(price_factor),
+                'title_similarity': float(title_sim)
+            }
+        return p_trust
 
     def seller_trust_score(self, df_reviews, df_products, asin):
         """Calculate seller trustworthiness score"""
@@ -136,15 +173,45 @@ class TrustworthyRecommender:
         except Exception:
             return 0.5
     
-    def final_product_score(self, df_reviews, df_products, asin, user_id=None):
-        """Calculate final combined trust score"""
-        p_trust = self.product_trust_score(df_reviews, df_products, asin)
+    def final_product_score(self, df_reviews, df_products, asin, user_id=None, include_details=False):
+        """Calculate final combined trust score
+        
+        Args:
+            df_reviews: DataFrame of reviews
+            df_products: DataFrame of products
+            asin: Product ASIN
+            user_id: Optional user ID for user trust calculation
+            include_details: If True, include intermediate calculation values
+            
+        Returns:
+            dict: Trust scores and optionally intermediate features
+        """
+        # Get detailed product trust breakdown
+        p_trust_details = self.product_trust_score(df_reviews, df_products, asin, return_details=True)
+        p_trust = p_trust_details['product_trust']
+        
         s_trust = self.seller_trust_score(df_reviews, df_products, asin)
         u_trust = self.user_trust_score(df_reviews, user_id) if user_id else 0.5
         
         final_score = 0.55 * p_trust + 0.35 * u_trust + 0.10 * s_trust
-        return {
-            'asin': asin, 'product_trust': round(p_trust, 3),
-            'user_trust': round(u_trust, 3), 'seller_trust': round(s_trust, 3),
+        
+        result = {
+            'asin': asin,
+            'product_trust': round(p_trust, 3),
+            'user_trust': round(u_trust, 3),
+            'seller_trust': round(s_trust, 3),
             'final_trust_score': round(final_score, 3)
         }
+        
+        # Include intermediate features if requested
+        if include_details:
+            result['details'] = {
+                'avg_rating_norm': round(p_trust_details['avg_rating_norm'], 3),
+                'verified_ratio': round(p_trust_details['verified_ratio'], 3),
+                'review_confidence': round(p_trust_details['review_confidence'], 3),
+                'text_quality': round(p_trust_details['text_quality'], 3),
+                'price_factor': round(p_trust_details['price_factor'], 3),
+                'title_similarity': round(p_trust_details['title_similarity'], 3)
+            }
+        
+        return result

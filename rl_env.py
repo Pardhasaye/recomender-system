@@ -47,27 +47,30 @@ class TrustworthyRLEnvironment(gym.Env if RL_AVAILABLE else object):
         self._precompute_features()
     
     def _precompute_features(self):
-        """MDP State Engineering"""
+        """MDP State Engineering - Optimized to reuse trust model calculations"""
         features = []
+        trust_data_cache = []  # Store complete trust data for each product
         
         print("[INFO] Precomputing MDP state features...")
         for idx, asin in enumerate(self.product_asins):
             if idx % 50 == 0:
                 print(f"  Processing product {idx}/{len(self.product_asins)}...")
             
-            # Get trust scores
+            # Get comprehensive trust scores with intermediate values
             trust_data = self.trust_model.final_product_score(
-                self.df_reviews, self.df_products, asin
+                self.df_reviews, self.df_products, asin, include_details=True
             )
             
-            reviews = self.df_reviews[self.df_reviews['asin'] == asin]
+            # Extract intermediate features from trust model (no redundant calculations!)
+            details = trust_data['details']
             
+            # Construct state vector using precomputed values from trust model
             state = np.array([
-                trust_data['final_trust_score'],           # S1: Trust score
-                reviews['rating'].mean() / 5.0,            # S2: Rating norm
-                reviews['verified_purchase'].mean(),       # S3: Verified ratio
-                1 - np.exp(-len(reviews) / 1000),          # S4: Review confidence
-                np.clip(reviews['text'].str.len().mean() / 500, 0, 1)  # S5: Text quality
+                trust_data['final_trust_score'],      # S1: Final trust score
+                details['avg_rating_norm'],            # S2: Rating norm (from trust model)
+                details['verified_ratio'],             # S3: Verified ratio (from trust model)
+                details['review_confidence'],          # S4: Review confidence (from trust model)
+                details['text_quality']                # S5: Text quality (from trust model)
             ], dtype=np.float32)
             
             # Ensure all values are valid
@@ -75,8 +78,10 @@ class TrustworthyRLEnvironment(gym.Env if RL_AVAILABLE else object):
             state = np.clip(state, 0.0, 1.0)
             
             features.append(state)
+            trust_data_cache.append(trust_data)  # Store complete trust data
         
         self.product_features = np.array(features)
+        self.trust_data_cache = trust_data_cache  # Store for later retrieval
         print(f"[DONE] Precomputed {len(features)} product state features")
 
     def get_product_state(self, asin):
@@ -85,6 +90,13 @@ class TrustworthyRLEnvironment(gym.Env if RL_AVAILABLE else object):
             return None
         idx = np.where(self.product_asins == asin)[0][0]
         return self.product_features[idx]
+    
+    def get_product_trust_data(self, asin):
+        """Get complete trust data breakdown for a specific product ASIN"""
+        if asin not in self.product_asins:
+            return None
+        idx = np.where(self.product_asins == asin)[0][0]
+        return self.trust_data_cache[idx]
     
     def reset(self, seed=None, options=None):
         """MDP: Reset to random state"""
