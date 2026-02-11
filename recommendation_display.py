@@ -114,3 +114,48 @@ def display_simple_recommendation(asin, trust_data, rl_decision, threshold):
     """
     verdict = "✓ TRUSTWORTHY" if rl_decision else "✗ RISKY"
     print(f"{asin}: {verdict} (Trust: {trust_data['final_trust_score']:.3f}, Threshold: {threshold:.3f})")
+
+
+def display_similar_product_recommendations(target_asin, target_product_info, recommendations):
+    """
+    Display similar product recommendations in a formatted way
+    
+    Args:
+        target_asin: Target product ASIN
+        target_product_info: Dictionary with target product info
+        recommendations: List of recommendation dictionaries
+    """
+    print("\n" + "="*80)
+    print(f"RECOMMENDATIONS FOR: {target_product_info['title'][:60]}...")
+    print(f"ASIN: {target_asin} | Price: ${target_product_info['price']:.2f}")
+    print("="*80)
+    
+    if not recommendations:
+        print("\n(No trustworthy similar products found)")
+        print("="*80 + "\n")
+        return
+
+    for i, rec in enumerate(recommendations, 1):
+        info = rec['product_info']
+        trust = rec['trust_data']
+        
+        # Handle missing product metadata
+        if info:
+            title = info.get('title', 'Unknown Product')
+            price = f"${info.get('price', 0.0):.2f}"
+        else:
+            title = "Unknown Product (Missing Metadata)"
+            price = "N/A"
+        
+        print(f"\n{i}. {title[:70]}...")
+        print(f"   ASIN: {rec['asin']} | Price: {price}")
+        print(f"   Similarity: {rec['similarity']:.1%} (Hybrid Score)")
+        print(f"   Trust Score: {trust['final_trust_score']:.3f} | Verdict: TRUSTWORTHY")
+        
+        # Breakdown
+        print("   Analysis:")
+        explanation_lines = rec['explanation'].split('\n')
+        for line in explanation_lines:
+            print(f"     {line}")
+            
+    print("\n" + "="*80 + "\n")

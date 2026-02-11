@@ -15,6 +15,8 @@ try:
     from trust_model import TrustworthyRecommender
     from rl_env import TrustworthyRLEnvironment
     from interactive_checker import run_interactive_mode
+    from recommendation_engine import RecommendationEngine
+    from recommendation_display import display_similar_product_recommendations
 except ImportError as e:
     print(f"❌ Error importing modules: {e}")
     # Fallback to local import if needed (e.g. if running as script vs package)
@@ -177,9 +179,12 @@ def main():
     product_trust_scores = {}
     
     unique_asins = df_reviews['asin'].unique()
-    for idx, asin in enumerate(unique_asins[:12224]):  # Calculate for top 100 products
-        if idx % 20 == 0:
-            print(f"  Progress: {idx}/{min(12224, len(unique_asins))} products processed...")
+    total_products = len(unique_asins)
+    print(f"\n[INFO] distinct products found: {total_products}")
+    
+    for idx, asin in enumerate(unique_asins):
+        if idx % 100 == 0:
+            print(f"  Progress: {idx}/{total_products} products processed...")
         
         product_reviews = df_reviews[df_reviews['asin'] == asin]
         if len(product_reviews) > 0:
@@ -316,6 +321,58 @@ def main():
         sample_asins = np.random.choice(rl_env.product_asins, 3, replace=False)
         for asin in sample_asins:
             predict_product_trust(asin)
+        
+        # ===== STEP 10.5: RECOMMENDATION DEMO =====
+        print("\n[STEP 10.5] RECOMMENDATION ENGINE DEMO")
+        print("="*60)
+        
+        # Initialize Recommendation Engine
+        rec_engine = RecommendationEngine(df_reviews, df_products, rl_env)
+        
+        # Demo for a trustworthy product
+        # Find a product with high trust score to use as target
+        demo_asin = None
+        
+        # Filter for products that exist in BOTH reviews and metadata
+        valid_asins = [a for a in sample_asins if a in df_products['asin'].values]
+        if not valid_asins:
+            # Try to find ANY product that is in both
+            common_asins = set(rl_env.product_asins) & set(df_products['asin'].unique())
+            if common_asins:
+                valid_asins = list(common_asins)[:3]
+                print(f"[INFO] Sample products missing metadata. Switched to: {valid_asins}")
+            else:
+                print(f"[WARN] No overlap between reviews and metadata in loaded {MAX_ROWS} rows.")
+                valid_asins = sample_asins # Fallback
+                
+        for asin in valid_asins:
+            t_data = rl_env.get_product_trust_data(asin)
+            if t_data and t_data['final_trust_score'] > 0.5: # Lower threshold to find match
+                demo_asin = asin
+                break
+        
+        if not demo_asin and valid_asins:
+            demo_asin = valid_asins[0]
+            
+        print(f"Finding similar trustworthy products for: {demo_asin}")
+        
+        if demo_asin not in df_products['asin'].values:
+             print(f"[WARN] Demo ASIN {demo_asin} not found in product metadata! Content similarity will fail.")
+
+        rec_results = rec_engine.get_recommendations_with_info(
+            demo_asin, 
+            min_trust=0.4, # Recommendation threshold
+            top_n=3
+        )
+        
+        if rec_results:
+             display_similar_product_recommendations(
+                demo_asin,
+                rec_results['target_product'],
+                rec_results['recommendations']
+            )
+        else:
+            print("No recommendations found for demo product.")
         
         # ===== STEP 11: INTERACTIVE MODE =====
         print("\n[STEP 11] INTERACTIVE MODE")

@@ -1,6 +1,11 @@
 
 import numpy as np
-from recommendation_display import display_product_recommendation, display_batch_recommendations
+from recommendation_engine import RecommendationEngine
+from recommendation_display import (
+    display_product_recommendation, 
+    display_batch_recommendations,
+    display_similar_product_recommendations
+)
 
 
 class InteractiveProductChecker:

@@ -65,7 +65,7 @@ class ProductSimilarity:
         target_avg_rating = target_reviews['rating'].mean()
         
         for asin, data in product_scores.items():
-            if data['count'] < 2:  # Require at least 2 co-reviews
+            if data['count'] < 1:  # Require at least 1 co-review (lowered for sparse data)
                 continue
             
             # Frequency score (normalized by target product's review count)
