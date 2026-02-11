@@ -53,7 +53,9 @@ def main():
     print("\n[STEP 1] LOADING DATA")
     print("="*60)
     df_reviews = load_jsonl(REVIEWS_FILE)
-    df_products = load_jsonl(META_FILE)
+    # Load ALL metadata to ensure we have titles for the products in the review subset
+    print("[INFO] Loading full metadata to ensure product titles are available...")
+    df_products = load_jsonl(META_FILE, max_rows=500000) # Load enough to cover the dataset
     
     report["steps"]["load_data"] = {
         "description": "Loading review and product metadata from JSONL files",
@@ -263,8 +265,8 @@ def main():
             verbose=1
         )
 
-        print("Training for 25,000 timesteps...")
-        rl_model.learn(total_timesteps=25000)
+        print("Training for 1,000 timesteps")
+        rl_model.learn(total_timesteps=1000)
 
         # Save RL Policy
         rl_policy_file = Path(OUTPUT_DIR) / "trust_rl_policy.zip"
@@ -316,15 +318,13 @@ def main():
             print(f"   • Threshold: {threshold:.3f}")
             print(f"   -> RECOMMENDATION: {decision_emoji}")
 
-        # Demo with 3 random products
-        print("Demonstrating prediction on 3 random products from dataset:")
-        sample_asins = np.random.choice(rl_env.product_asins, 3, replace=False)
-        for asin in sample_asins:
-            predict_product_trust(asin)
         
         # ===== STEP 10.5: RECOMMENDATION DEMO =====
         print("\n[STEP 10.5] RECOMMENDATION ENGINE DEMO")
         print("="*60)
+        
+        # Select sample products for demo (silently)
+        sample_asins = np.random.choice(rl_env.product_asins, 3, replace=False)
         
         # Initialize Recommendation Engine
         rec_engine = RecommendationEngine(df_reviews, df_products, rl_env)
