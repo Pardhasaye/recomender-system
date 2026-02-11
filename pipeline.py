@@ -290,9 +290,8 @@ def main():
         avg_reward = total_reward / n_eval
         print(f"  • Average MDP Reward: {avg_reward:.3f}")
 
-        # ===== STEP 10: REAL-TIME PREDICTION DEMO =====
-        print("\n[STEP 10] REAL-TIME PRODUCT PREDICTIONS")
-        print("="*60)
+        
+
         
         def predict_product_trust(asin_to_check):
             """Predict trust for a specific product using trained RL policy"""
