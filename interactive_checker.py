@@ -18,6 +18,13 @@ class InteractiveProductChecker:
         self.rl_env = rl_env
         self.trained_model = trained_model
         self.default_threshold = default_threshold
+        
+        # Initialize recommendation engine
+        self.rec_engine = RecommendationEngine(
+            rl_env.df_reviews,
+            rl_env.df_products,
+            rl_env
+        )
     
     def get_rl_decision(self, state):
         """
@@ -71,6 +78,29 @@ class InteractiveProductChecker:
         
         return True
     
+    def check_similar_products(self, asin):
+        """
+        Find and display similar trustworthy products
+        """
+        print(f"\n🔍 Searching for trustworthy products similar to {asin}...")
+        
+        results = self.rec_engine.get_recommendations_with_info(
+            asin, 
+            min_trust=self.default_threshold,
+            top_n=5
+        )
+        
+        if not results:
+            print(f"❌ Error: Could not find data for ASIN '{asin}'.")
+            return False
+            
+        display_similar_product_recommendations(
+            asin,
+            results['target_product'],
+            results['recommendations']
+        )
+        return True
+
     def check_random_products(self, n):
         """
         Check N random products from the dataset
@@ -123,14 +153,14 @@ class InteractiveProductChecker:
             print("MAIN MENU:")
             print("  1. Check specific ASIN")
             print("  2. Check N random products")
-            print("  3. Exit")
+            print("  3. Find similar trustworthy products")
+            print("  4. Exit")
             print("-"*70)
             
             try:
-                choice = input("\nEnter your choice (1-3): ").strip()
+                choice = input("\nEnter your choice (1-4): ").strip()
                 
                 if choice == '1':
-                    # Check specific ASIN
                     asin = input("\nEnter product ASIN: ").strip()
                     if not asin:
                         print("❌ Error: ASIN cannot be empty.")
@@ -138,7 +168,6 @@ class InteractiveProductChecker:
                     self.check_specific_asin(asin)
                 
                 elif choice == '2':
-                    # Check random products
                     n_input = input("\nEnter number of random products to check: ").strip()
                     try:
                         n = int(n_input)
@@ -151,13 +180,19 @@ class InteractiveProductChecker:
                         continue
                 
                 elif choice == '3':
-                    # Exit
+                    asin = input("\nEnter ASIN of product you bought/like: ").strip()
+                    if not asin:
+                        print("❌ Error: ASIN cannot be empty.")
+                        continue
+                    self.check_similar_products(asin)
+
+                elif choice == '4':
                     print("\n👋 Thank you for using the Trustworthy Product Recommendation System!")
                     print("="*70 + "\n")
                     break
                 
                 else:
-                    print("❌ Error: Invalid choice. Please enter 1, 2, or 3.")
+                    print("❌ Error: Invalid choice. Please enter 1, 2, 3 or 4.")
             
             except KeyboardInterrupt:
                 print("\n\n👋 Interrupted by user. Exiting...")
@@ -165,6 +200,8 @@ class InteractiveProductChecker:
                 break
             except Exception as e:
                 print(f"\n❌ Unexpected error: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
 
 
